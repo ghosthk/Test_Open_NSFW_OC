@@ -24,6 +24,7 @@
 
 - (UIImage*)tf_resizeImage:(CGSize)size;
 - (NSData*)tf_rgbData;
+- (CVPixelBufferRef)tf_toPixelbuffer;
 
 @end
 
@@ -110,6 +111,14 @@
         [self _ayncMainQueueError:@"Input Image is nil" code:101 beginTime:beginTimeInterval completion:completion];
         return;
     }
+//    /** 临时测试pixelbuffer识别*/
+//
+//    CVPixelBufferRef pixelbuffer = [image tf_toPixelbuffer];
+//
+//    [self _classifyCVPixelBuffer:pixelbuffer completion:completion];
+//
+//    return;
+//    /** 结束测试*/
     
     image = [image tf_resizeImage:CGSizeMake(self.limitWidth, self.limitHeight)];
     
@@ -218,12 +227,12 @@
 
 @end
 
-
 @implementation UIImage (TFModel)
 
 - (UIImage*)tf_resizeImage:(CGSize)toSize {
     return [self tf_resizeImage:toSize fill:false];
 }
+
 - (UIImage*)tf_resizeImage:(CGSize)toSize fill:(BOOL)fill {
     CGSize size = self.size;
     float widthRatio  = toSize.width  / size.width;
@@ -274,14 +283,16 @@
     UInt8 *imageData = CGBitmapContextGetData(context);
     
     NSMutableData *inputData = [[NSMutableData alloc] initWithCapacity:0];
-    for (int row = 0; row < width; row++) {
-        for (int col = 0; col < height; col++) {
+    for (int col = 0; col < height; col++) {
+        for (int row = 0; row < width; row++) {
             long offset = 4 * (col * width + row);
             
-            //            Float32 alph = imageData[offset];
-            Float32 red = imageData[offset+1];
-            Float32 green = imageData[offset+2];
-            Float32 blue = imageData[offset+3];
+            Float32 blue = imageData[offset];
+            Float32 green = imageData[offset+1];
+            Float32 red = imageData[offset+2];
+            
+//            Float32 alph = imageData[offset+3];
+//            printf("%f %f %f %f\n",red, green, blue, alph);
             
             Float32 red1 = red - 123;
             Float32 green1 = green - 117;
@@ -294,7 +305,73 @@
     }
     CGColorSpaceRelease(colorSpace);
     CGContextRelease(context);
+    
     return inputData;
+}
+
+- (CVPixelBufferRef)tf_toPixelbuffer {
+    CGSize size = self.size;
+    CGImageRef image = [self CGImage];
+    
+    BOOL hasAlpha = CGImageRefContainsAlpha(image);
+    CFDictionaryRef empty = CFDictionaryCreate(kCFAllocatorDefault, NULL, NULL, 0, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    
+    NSDictionary *options = [NSDictionary dictionaryWithObjectsAndKeys:
+                             [NSNumber numberWithBool:YES], kCVPixelBufferCGImageCompatibilityKey,
+                             [NSNumber numberWithBool:YES], kCVPixelBufferCGBitmapContextCompatibilityKey,
+                             empty, kCVPixelBufferIOSurfacePropertiesKey,
+                             nil];
+    CVPixelBufferRef pxbuffer = NULL;
+    CVReturn status = CVPixelBufferCreate(kCFAllocatorDefault, size.width, size.height, kCVPixelFormatType_32BGRA, (__bridge CFDictionaryRef) options, &pxbuffer);
+    
+    NSParameterAssert(status == kCVReturnSuccess && pxbuffer != NULL);
+    
+    CVPixelBufferLockBaseAddress(pxbuffer, 0);
+    void *pxdata = CVPixelBufferGetBaseAddress(pxbuffer);
+    NSParameterAssert(pxdata != NULL);
+    
+    CGColorSpaceRef rgbColorSpace = CGColorSpaceCreateDeviceRGB();
+    
+    uint32_t bitmapInfo = bitmapInfoWithPixelFormatType(kCVPixelFormatType_32BGRA, (bool)hasAlpha);
+    
+    CGContextRef context = CGBitmapContextCreate(pxdata, size.width, size.height, 8, CVPixelBufferGetBytesPerRow(pxbuffer), rgbColorSpace, bitmapInfo);
+    NSParameterAssert(context);
+    
+    CGContextDrawImage(context, CGRectMake(0, 0, CGImageGetWidth(image), CGImageGetHeight(image)), image);
+    CVPixelBufferUnlockBaseAddress(pxbuffer, 0);
+    
+    CGColorSpaceRelease(rgbColorSpace);
+    CGContextRelease(context);
+    
+    return pxbuffer;
+}
+
+// alpha的判断
+BOOL CGImageRefContainsAlpha(CGImageRef imageRef) {
+    if (!imageRef) {
+        return NO;
+    }
+    CGImageAlphaInfo alphaInfo = CGImageGetAlphaInfo(imageRef);
+    BOOL hasAlpha = !(alphaInfo == kCGImageAlphaNone ||
+                      alphaInfo == kCGImageAlphaNoneSkipFirst ||
+                      alphaInfo == kCGImageAlphaNoneSkipLast);
+    return hasAlpha;
+}
+
+static uint32_t bitmapInfoWithPixelFormatType(OSType inputPixelFormat, bool hasAlpha){
+    if (inputPixelFormat == kCVPixelFormatType_32BGRA) {
+        uint32_t bitmapInfo = kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Host;
+        if (!hasAlpha) {
+            bitmapInfo = kCGImageAlphaNoneSkipFirst | kCGBitmapByteOrder32Host;
+        }
+        return bitmapInfo;
+    }else if (inputPixelFormat == kCVPixelFormatType_32ARGB) {
+        uint32_t bitmapInfo = kCGImageAlphaPremultipliedFirst | kCGBitmapByteOrder32Big;
+        return bitmapInfo;
+    }else{
+        NSLog(@"不支持此格式");
+        return 0;
+    }
 }
 
 @end
@@ -381,6 +458,8 @@ void freePixelBufferDataAfterRelease(void *releaseRefCon, const void *baseAddres
         Float32 red = baseAddress[offset+[rgbChannelMap[0] intValue]];
         Float32 green = baseAddress[offset+[rgbChannelMap[1] intValue]];
         Float32 blue = baseAddress[offset+[rgbChannelMap[2] intValue]];
+        
+//        printf("%f %f %f\n",red, green, blue);
         
         Float32 red1 = red - 123;
         Float32 green1 = green - 117;

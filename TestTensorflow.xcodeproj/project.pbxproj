@@ -409,6 +409,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/TensorFlowLiteObjC/TFLTensorFlowLite.framework/Headers\"",
 				);
 				INFOPLIST_FILE = TestTensorflow/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -431,6 +432,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/TensorFlowLiteObjC/TFLTensorFlowLite.framework/Headers\"",
 				);
 				INFOPLIST_FILE = TestTensorflow/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
