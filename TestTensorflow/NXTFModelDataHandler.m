@@ -112,11 +112,11 @@
         return;
     }
 //    /** 临时测试pixelbuffer识别*/
-//
 //    CVPixelBufferRef pixelbuffer = [image tf_toPixelbuffer];
 //
 //    [self _classifyCVPixelBuffer:pixelbuffer completion:completion];
 //
+//    CVPixelBufferRelease(pixelbuffer);
 //    return;
 //    /** 结束测试*/
     
@@ -230,39 +230,8 @@
 @implementation UIImage (TFModel)
 
 - (UIImage*)tf_resizeImage:(CGSize)toSize {
-    return [self tf_resizeImage:toSize fill:false];
-}
-
-- (UIImage*)tf_resizeImage:(CGSize)toSize fill:(BOOL)fill {
-    CGSize size = self.size;
-    float widthRatio  = toSize.width  / size.width;
-    float heightRatio = toSize.height / size.height;
-    CGFloat ratio = 1.0f;
-    if (fill) {
-        ratio = MIN(widthRatio, heightRatio);
-    }else {
-        ratio = MAX(widthRatio, heightRatio);
-    }
-    float xDiff = 0.0f;
-    float yDiff = 0.0f;
-    CGSize scaleSize = CGSizeMake(size.width * ratio,  size.height * ratio);
-    CGSize resultSize = scaleSize;
-    if (fill) {
-        
-    }else {
-        resultSize = toSize;
-        if (widthRatio > heightRatio) {
-            yDiff = (resultSize.height - scaleSize.height)/2;
-        }else {
-            xDiff = (resultSize.width - scaleSize.width)/2;
-        }
-    }
-    // This is the rect that we've calculated out and this is what is actually used below
-    CGRect rect = CGRectMake(xDiff, yDiff, scaleSize.width, scaleSize.height);
-    
-    // Actually do the resizing to the rect using the ImageContext stuff
-    UIGraphicsBeginImageContextWithOptions(resultSize, false, 1.0f);
-    [self drawInRect:rect];
+    UIGraphicsBeginImageContextWithOptions(toSize, false, 1.0f);
+    [self drawInRect:CGRectMake(0.0f, 0.0f, toSize.width, toSize.height)];
     UIImage *newImage = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
     return newImage;
@@ -403,7 +372,7 @@ void freePixelBufferDataAfterRelease(void *releaseRefCon, const void *baseAddres
     }else {
         originX = (imageWidth - scaleSize.width)/2;
     }
-    
+        
     NSInteger thumbnailRowBytes = toSize.width * imageChannel;
 
     uint8_t *baseAddress = (uint8_t *)CVPixelBufferGetBaseAddress(pixelBuffer);
